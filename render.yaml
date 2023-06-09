@@ -1,4 +1,0 @@
-name: my-express-server
-type: web
-buildCommand: npm install && node index.js
-startCommand: node index.js
