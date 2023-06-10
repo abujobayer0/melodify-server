@@ -1,4 +1,4 @@
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const express = require("express");
 const cors = require("cors");
 const { reset } = require("nodemon");
@@ -30,6 +30,9 @@ async function run() {
     await client.connect();
     const usersCollection = client.db("users-collection").collection("users");
     const classCollection = client.db("class-collection").collection("classes");
+    const selectCollection = client
+      .db("classes")
+      .collection("selected-collection");
     app.post("/users", async (req, res) => {
       const user = req.body;
       const result = await usersCollection.insertOne(user);
@@ -38,6 +41,44 @@ async function run() {
     });
     app.get("/users", async (req, res) => {
       const result = await usersCollection.find().toArray();
+      res.send(result);
+    });
+    app.get("/user/selectedClass", async (req, res) => {
+      const email = req.query.email;
+      const selection = await selectCollection.find({ email: email }).toArray();
+      res.send(selection);
+    });
+    app.get("/selectedClass/count", async (req, res) => {
+      const email = req.query.email;
+      const count = (await selectCollection.find({ email: email }).toArray())
+        .length;
+      res.status(200).send({ count });
+    });
+
+    app.post("/user/selectedClass", async (req, res) => {
+      const { email, classItem } = req.body;
+      const allSelectedCollection = await selectCollection.find().toArray();
+      if (
+        allSelectedCollection.find(
+          (i) => i?.selectedClass?._id === classItem._id && i.email === email
+        )
+      ) {
+        res.status(400).json({ error: "Class Already Selected" });
+        return;
+      }
+      const collection = await selectCollection.insertOne({
+        email: email,
+        selectedClass: classItem,
+      });
+      res.send(collection);
+      console.log({ selectedClass: classItem._id });
+    });
+    app.delete("/user/selectedClass/:id", async (req, res) => {
+      const { id } = req.params;
+      console.log(id);
+      const result = await selectCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
       res.send(result);
     });
     app.get("/userExists", async (req, res) => {
@@ -70,7 +111,7 @@ async function run() {
     });
     app.get("/classes", async (req, res) => {
       const result = await classCollection
-        .find({ status: "approved" })
+        .find({ "newClass.status": "approved" })
         .toArray();
       res.send(result);
     });
@@ -78,12 +119,79 @@ async function run() {
       const result = await classCollection.find().toArray();
       res.send(result);
     });
+    app.get("/all/classes/:id", async (req, res) => {
+      const id = req.params.id;
+      console.log(id);
+      const intId = parseInt(id);
+      const query = { _id: new ObjectId(id) };
+      const result = await classCollection.find(query).toArray();
+      res.send(result);
+      console.log(result);
+    });
+    app.get("/admin/classes/instructors/users/count", async (req, res) => {
+      const classCount = (await classCollection.find().toArray()).length;
+      const userCount = (await usersCollection.find().toArray()).length;
+      const instructorCount = (
+        await usersCollection.find({ role: "instructor" }).toArray()
+      ).length;
+      res.send({ userCount, classCount, instructorCount });
+    });
     app.post("/class", async (req, res) => {
       const newClass = req.body;
       const result = classCollection.insertOne(newClass);
       console.log(newClass);
       res.send(result);
     });
+    app.put("/classes/update", async (req, res) => {
+      const id = req.query.id;
+      const query = { _id: new ObjectId(id) };
+      const { available_seat, price, detail } = req.body;
+      const result = await classCollection.updateOne(query, {
+        $set: {
+          "newClass.available_seat": available_seat,
+          "newClass.price": price,
+          "newClass.detail": detail,
+        },
+      });
+      res.send(result);
+    });
+    app.put("/classes/status", async (req, res) => {
+      const id = req.query.id;
+      const status = req.body.status;
+      const query = { _id: new ObjectId(id) };
+      const result = await classCollection.updateOne(query, {
+        $set: {
+          "newClass.status": status,
+        },
+      });
+      console.log(id, status);
+      res.send(result);
+    });
+    app.put("/users/role", async (req, res) => {
+      const id = req.query.id;
+      const status = req.body.role;
+      const query = { _id: new ObjectId(id) };
+      const result = await usersCollection.updateOne(query, {
+        $set: {
+          role: status,
+        },
+      });
+      console.log(id, status);
+      res.send(result);
+    });
+    app.put("/classes/feedback", async (req, res) => {
+      const id = req.query.id;
+      const feedback = req.body.feedback;
+      const query = { _id: new ObjectId(id) };
+      const result = await classCollection.updateOne(query, {
+        $set: {
+          "newClass.feedback": feedback,
+        },
+      });
+      console.log(id, feedback);
+      res.send(result);
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
