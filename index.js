@@ -1,8 +1,8 @@
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const express = require("express");
-const cors = require("cors");
-const { reset } = require("nodemon");
 require("dotenv").config();
+const cors = require("cors");
+const stripe = require("stripe")(process.env.PAYMENT_SECRET);
 
 const app = express();
 const PORT = process.env.PORT || 7000;
@@ -33,28 +33,73 @@ async function run() {
     const selectCollection = client
       .db("classes")
       .collection("selected-collection");
+    const paymentHistoryCollection = client
+      .db("payments")
+      .collection("history");
+
     app.post("/users", async (req, res) => {
       const user = req.body;
       const result = await usersCollection.insertOne(user);
       res.send(result);
-      console.log(user);
     });
     app.get("/users", async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
-    app.get("/user/selectedClass", async (req, res) => {
-      const email = req.query.email;
-      const selection = await selectCollection.find({ email: email }).toArray();
-      res.send(selection);
+    //payment history
+    app.post("/payment/history", async (req, res) => {
+      const payment = req.body;
+      const result = await paymentHistoryCollection.insertOne(payment);
+      res.send(result);
     });
-    app.get("/selectedClass/count", async (req, res) => {
+    app.get("/payment/history", async (req, res) => {
       const email = req.query.email;
-      const count = (await selectCollection.find({ email: email }).toArray())
-        .length;
-      res.status(200).send({ count });
+      const count = (
+        await paymentHistoryCollection
+          .find({ "payment.email": email })
+          .toArray()
+      ).length;
+      const result = await paymentHistoryCollection
+        .find({ "payment.email": email })
+        .toArray();
+      res.send({ result, count });
     });
 
+    app.get("/user/selectedClass", async (req, res) => {
+      const email = req.query.email;
+      const selection = await selectCollection
+        .find({ email: email, enroll: { $ne: true } })
+        .toArray();
+      res.send(selection);
+    });
+
+    app.get("/selectedClass/count", async (req, res) => {
+      const email = req.query.email;
+      const count = (
+        await selectCollection
+          .find({ email: email, enroll: { $ne: true } })
+          .toArray()
+      ).length;
+      res.status(200).send({ count });
+    });
+    //create payment intend
+    app.post("/create-payment-intent", async (req, res) => {
+      const price = req.body.price;
+      const amount = price * 100;
+      if (amount > 0) {
+        console.log(amount, price);
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount,
+          currency: "usd",
+          payment_method_types: ["card"],
+        });
+        res.send({
+          clientSecret: paymentIntent.client_secret,
+        });
+      } else {
+        res.status(403).send({ message: "error" });
+      }
+    });
     app.post("/user/selectedClass", async (req, res) => {
       const { email, classItem } = req.body;
       const allSelectedCollection = await selectCollection.find().toArray();
@@ -71,11 +116,10 @@ async function run() {
         selectedClass: classItem,
       });
       res.send(collection);
-      console.log({ selectedClass: classItem._id });
     });
     app.delete("/user/selectedClass/:id", async (req, res) => {
       const { id } = req.params;
-      console.log(id);
+
       const result = await selectCollection.deleteOne({
         _id: new ObjectId(id),
       });
@@ -121,12 +165,10 @@ async function run() {
     });
     app.get("/all/classes/:id", async (req, res) => {
       const id = req.params.id;
-      console.log(id);
-      const intId = parseInt(id);
+
       const query = { _id: new ObjectId(id) };
       const result = await classCollection.find(query).toArray();
       res.send(result);
-      console.log(result);
     });
     app.get("/admin/classes/instructors/users/count", async (req, res) => {
       const classCount = (await classCollection.find().toArray()).length;
@@ -139,7 +181,7 @@ async function run() {
     app.post("/class", async (req, res) => {
       const newClass = req.body;
       const result = classCollection.insertOne(newClass);
-      console.log(newClass);
+
       res.send(result);
     });
     app.put("/classes/update", async (req, res) => {
@@ -155,6 +197,44 @@ async function run() {
       });
       res.send(result);
     });
+    app.put("/classes/enroll/status", async (req, res) => {
+      const id = req.query.id;
+      const query = { _id: new ObjectId(id) };
+      const { userEmail } = req.body;
+      const queryTwo = { email: userEmail };
+      const classDoc = await classCollection.findOne(query);
+      const selectedClassesCollection = await selectCollection.updateOne(
+        queryTwo,
+        {
+          $set: {
+            enroll: true,
+          },
+        }
+      );
+      if (!classDoc) {
+        return res.status(404).send("Class not found");
+      }
+      const enrollEmails = classDoc.newClass.enroll || [];
+      if (enrollEmails.includes(userEmail)) {
+        return res
+          .status(400)
+          .send({ error: { message: "Email already enrolled in this class" } });
+      }
+      const availableSeats = classDoc.newClass.available_seat;
+      if (availableSeats <= 0) {
+        return res.status(400).send("No available seats");
+      }
+      enrollEmails.push(userEmail);
+      const updatedSeats = availableSeats - enrollEmails.length;
+      const result = await classCollection.updateOne(query, {
+        $set: {
+          "newClass.available_seat": updatedSeats,
+          "newClass.enroll": enrollEmails,
+        },
+      });
+      res.send({ result, selectedClassesCollection });
+      console.log(userEmail);
+    });
     app.put("/classes/status", async (req, res) => {
       const id = req.query.id;
       const status = req.body.status;
@@ -164,7 +244,7 @@ async function run() {
           "newClass.status": status,
         },
       });
-      console.log(id, status);
+
       res.send(result);
     });
     app.put("/users/role", async (req, res) => {
@@ -176,7 +256,7 @@ async function run() {
           role: status,
         },
       });
-      console.log(id, status);
+
       res.send(result);
     });
     app.put("/classes/feedback", async (req, res) => {
@@ -188,7 +268,7 @@ async function run() {
           "newClass.feedback": feedback,
         },
       });
-      console.log(id, feedback);
+
       res.send(result);
     });
 
