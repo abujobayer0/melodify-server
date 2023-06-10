@@ -1,9 +1,0 @@
-# render.yaml
-
-services:
-  - name: express-server
-    buildCommand: npm ci
-    startCommand: npm start
-    healthCheckPath: /health
-    healthCheckTimeoutSeconds: 10
-    httpPort: 8080
