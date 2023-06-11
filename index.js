@@ -46,24 +46,6 @@ async function run() {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
-    //payment history
-    app.post("/payment/history", async (req, res) => {
-      const payment = req.body;
-      const result = await paymentHistoryCollection.insertOne(payment);
-      res.send(result);
-    });
-    app.get("/payment/history", async (req, res) => {
-      const email = req.query.email;
-      const count = (
-        await paymentHistoryCollection
-          .find({ "payment.email": email })
-          .toArray()
-      ).length;
-      const result = await paymentHistoryCollection
-        .find({ "payment.email": email })
-        .toArray();
-      res.send({ result, count });
-    });
 
     app.get("/user/selectedClass", async (req, res) => {
       const email = req.query.email;
@@ -87,7 +69,6 @@ async function run() {
       const price = req.body.price;
       const amount = price * 100;
       if (amount > 0) {
-        console.log(amount, price);
         const paymentIntent = await stripe.paymentIntents.create({
           amount: amount,
           currency: "usd",
@@ -125,6 +106,58 @@ async function run() {
       });
       res.send(result);
     });
+    app.get("/user/selectedClass/:id/:email", async (req, res) => {
+      const { id, email } = req.params;
+
+      try {
+        const result = await selectCollection.findOne({
+          email: email,
+          _id: new ObjectId(id),
+        });
+
+        res.send(result);
+      } catch (error) {
+        res.status(500).send("Error retrieving data");
+      }
+    });
+    app.get("/enroll/totalLength", async (req, res) => {
+      try {
+        const email = req.query.email;
+        const query = { "newClass.email": email };
+        const classItems = await classCollection.find(query).toArray();
+
+        const totalLength = classItems.reduce(
+          (total, item) => total + (item.newClass?.enroll?.length || 0),
+          0
+        );
+
+        res.send({ totalLength });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({
+          error: "An error occurred while calculating total enroll length.",
+        });
+      }
+    });
+
+    app.put("/user/selectedClass/:id/:email", async (req, res) => {
+      const { id, email } = req.params;
+
+      try {
+        const result = await selectCollection.updateOne(
+          { _id: new ObjectId(id), email: email },
+          {
+            $set: {
+              enroll: true,
+            },
+          }
+        );
+
+        res.send(result);
+      } catch (error) {
+        res.status(500).send("Error retrieving data");
+      }
+    });
     app.get("/userExists", async (req, res) => {
       const email = req.query.email;
       const query = { email: email };
@@ -142,6 +175,7 @@ async function run() {
       const result = await usersCollection.find(query).toArray();
       res.send(result);
     });
+
     app.get("/instructor/classes", async (req, res) => {
       const email = req.query.email;
       const result = await classCollection
@@ -153,6 +187,75 @@ async function run() {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
+
+    app.get("/popular/instructors", async (req, res) => {
+      try {
+        const result = await classCollection
+          .aggregate([
+            {
+              $group: {
+                _id: "$newClass.instructor",
+                totalEnrollments: {
+                  $sum: {
+                    $size: {
+                      $ifNull: ["$newClass.enroll", []],
+                    },
+                  },
+                },
+                instructorImage: {
+                  $first: "$newClass.instructorIcon",
+                },
+                instructorEmail: {
+                  $first: "$newClass.email",
+                },
+                approvedCourseCount: {
+                  $sum: {
+                    $cond: [{ $eq: ["$newClass.status", "approved"] }, 1, 0],
+                  },
+                },
+                emailCount: {
+                  $sum: 1,
+                },
+              },
+            },
+            {
+              $project: {
+                _id: 0,
+                instructor: "$_id",
+                instructorImage: 1,
+                instructorEmail: 1,
+                totalEnrollments: 1,
+                approvedCourseCount: 1,
+                emailCount: 1,
+              },
+            },
+          ])
+          .toArray();
+        const sortedResult = result.sort((a, b) => {
+          const enrollA = a?.totalEnrollments || 0;
+          const enrollB = b?.totalEnrollments || 0;
+
+          return enrollB - enrollA;
+        });
+        res.json(sortedResult);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
+    app.get("/popular/classes", async (req, res) => {
+      const result = await classCollection
+        .find({ "newClass.status": "approved" })
+        .toArray();
+      const sortedClasses = result.sort((a, b) => {
+        const enrollA = a.newClass?.enroll?.length || 0;
+        const enrollB = b.newClass?.enroll?.length || 0;
+
+        return enrollB - enrollA;
+      });
+      res.send(sortedClasses.slice(0, 6));
+    });
     app.get("/classes", async (req, res) => {
       const result = await classCollection
         .find({ "newClass.status": "approved" })
@@ -163,6 +266,8 @@ async function run() {
       const result = await classCollection.find().toArray();
       res.send(result);
     });
+
+    //Work
     app.get("/all/classes/:id", async (req, res) => {
       const id = req.params.id;
 
@@ -184,6 +289,7 @@ async function run() {
 
       res.send(result);
     });
+
     app.put("/classes/update", async (req, res) => {
       const id = req.query.id;
       const query = { _id: new ObjectId(id) };
@@ -197,44 +303,62 @@ async function run() {
       });
       res.send(result);
     });
-    app.put("/classes/enroll/status", async (req, res) => {
+    app.put("/selected/enrolled/", async (req, res) => {
+      const email = req.query.email;
       const id = req.query.id;
-      const query = { _id: new ObjectId(id) };
-      const { userEmail } = req.body;
-      const queryTwo = { email: userEmail };
-      const classDoc = await classCollection.findOne(query);
-      const selectedClassesCollection = await selectCollection.updateOne(
-        queryTwo,
+
+      const result = await selectCollection.updateOne(
+        { _id: new ObjectId(id), email: email },
         {
           $set: {
             enroll: true,
           },
         }
       );
-      if (!classDoc) {
-        return res.status(404).send("Class not found");
-      }
-      const enrollEmails = classDoc.newClass.enroll || [];
-      if (enrollEmails.includes(userEmail)) {
-        return res
-          .status(400)
-          .send({ error: { message: "Email already enrolled in this class" } });
-      }
-      const availableSeats = classDoc.newClass.available_seat;
-      if (availableSeats <= 0) {
-        return res.status(400).send("No available seats");
-      }
-      enrollEmails.push(userEmail);
-      const updatedSeats = availableSeats - enrollEmails.length;
-      const result = await classCollection.updateOne(query, {
-        $set: {
-          "newClass.available_seat": updatedSeats,
-          "newClass.enroll": enrollEmails,
-        },
-      });
-      res.send({ result, selectedClassesCollection });
-      console.log(userEmail);
+
+      res.send(result);
     });
+
+    app.put("/classes/enroll/status", async (req, res) => {
+      try {
+        const id = req.query.id;
+        const query = { _id: new ObjectId(id) };
+        const email = req.query.email;
+
+        const classDoc = await classCollection.findOne(query);
+
+        if (!classDoc) {
+          return res.status(404).send("Class not found");
+        }
+
+        const enrollEmails = classDoc.newClass.enroll || [];
+
+        const availableSeats = classDoc.newClass.available_seat;
+        if (availableSeats <= 0) {
+          return res.status(400).send("No available seats");
+        }
+
+        enrollEmails.push(email);
+        const updatedSeats = availableSeats - 1;
+
+        const updateResult = await classCollection.updateOne(query, {
+          $set: {
+            "newClass.available_seat": updatedSeats,
+            "newClass.enroll": enrollEmails,
+          },
+        });
+
+        if (updateResult.modifiedCount !== 1) {
+          return res.status(500).send("Failed to update class enrollment");
+        }
+
+        res.send({ result: updateResult });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
+
     app.put("/classes/status", async (req, res) => {
       const id = req.query.id;
       const status = req.body.status;
@@ -270,6 +394,23 @@ async function run() {
       });
 
       res.send(result);
+    });
+    //payment history
+    app.post("/payment/history", async (req, res) => {
+      const payment = req.body;
+      payment.timestamp = new Date();
+      const result = await paymentHistoryCollection.insertOne(payment);
+      res.send(result);
+    });
+
+    app.get("/payment/history", async (req, res) => {
+      const email = req.query.email;
+      const result = await paymentHistoryCollection
+        .find({ "payment.email": email })
+        .sort({ timestamp: -1 })
+        .toArray();
+      const count = result.length;
+      res.send({ result, count });
     });
 
     // Send a ping to confirm a successful connection
