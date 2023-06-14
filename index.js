@@ -468,7 +468,10 @@ async function run() {
     app.get("/enrolled/single/instructor", async (res, req) => {
       const email = req.query.email;
       const instructorEmail = req.query.instructorEmail;
-      const query = { email: email, instructorEmail: instructorEmail };
+      const query = {
+        "payment.email": email,
+        "payment.instructorEmail": instructorEmail,
+      };
       const result = await paymentHistoryCollection.find(query).toArray();
       const count = result.length;
       res.send(result, count);
