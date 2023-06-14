@@ -435,6 +435,7 @@ async function run() {
       res.send(result);
       console.log("api hit", result);
     });
+
     app.get("/question-answer", async (req, res) => {
       const email = req.query.email;
       const instructorEmail = req.query.instructorEmail;
@@ -445,6 +446,7 @@ async function run() {
       const result = await QACollection.find(query).toArray();
       res.send(result);
     });
+
     app.get("/user/question-answer", async (req, res) => {
       const email = req.query.email;
       const query = {
@@ -453,6 +455,7 @@ async function run() {
       const result = await QACollection.find(query).toArray();
       res.send(result);
     });
+
     app.get("/payment/history", async (req, res) => {
       const email = req.query.email;
       const result = await paymentHistoryCollection
@@ -462,7 +465,14 @@ async function run() {
       const count = result.length;
       res.send({ result, count });
     });
-
+    app.get("/enrolled/single/instructor", async (res, req) => {
+      const email = req.query.email;
+      const instructorEmail = req.query.instructorEmail;
+      const query = { email: email, instructorEmail: instructorEmail };
+      const result = await paymentHistoryCollection.find(query).toArray();
+      const count = result.length;
+      res.send(result, count);
+    });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
