@@ -46,7 +46,33 @@ async function run() {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
+    app.put("/update/user", async (req, res) => {
+      const email = req.query.email;
+      const { name, address, number, gender } = req.body;
+      console.log(name, address, number, gender);
+      const query = { email: email };
+      const result = await usersCollection.updateOne(query, {
+        $set: {
+          name: name,
+          gender: gender,
+          contactNumber: number,
+          address: address,
+        },
+      });
+      res.send(result);
+    });
+    app.put("/update/user/profile/image", async (req, res) => {
+      const email = req.query.email;
+      const { image } = req.body;
 
+      const query = { email: email };
+      const result = await usersCollection.updateOne(query, {
+        $set: {
+          image: image,
+        },
+      });
+      res.send(result);
+    });
     app.get("/user/selectedClass", async (req, res) => {
       const email = req.query.email;
       const selection = await selectCollection
@@ -437,7 +463,7 @@ const html = `
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Hello from Render!</title>
+    <title>Hello from Melodify!</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
     <script>
       setTimeout(() => {
