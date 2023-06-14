@@ -36,7 +36,7 @@ async function run() {
     const paymentHistoryCollection = client
       .db("payments")
       .collection("history");
-
+    const QACollection = client.db("QA").collection("QA-Collection");
     app.post("/users", async (req, res) => {
       const user = req.body;
       const result = await usersCollection.insertOne(user);
@@ -73,6 +73,7 @@ async function run() {
       });
       res.send(result);
     });
+
     app.get("/user/selectedClass", async (req, res) => {
       const email = req.query.email;
       const selection = await selectCollection
@@ -428,7 +429,22 @@ async function run() {
       const result = await paymentHistoryCollection.insertOne(payment);
       res.send(result);
     });
-
+    app.post("/user/question-answers", async (req, res) => {
+      const QA = req.body.QA;
+      const result = await QACollection.insertOne(QA);
+      res.send(result);
+      console.log("api hit", result);
+    });
+    app.get("/question-answer", async (req, res) => {
+      const email = req.query.email;
+      const instructorEmail = req.query.instructorEmail;
+      const query = {
+        "user.email": email,
+        "instructor.email": instructorEmail,
+      };
+      const result = await QACollection.find(query).toArray();
+      res.send(result);
+    });
     app.get("/payment/history", async (req, res) => {
       const email = req.query.email;
       const result = await paymentHistoryCollection
