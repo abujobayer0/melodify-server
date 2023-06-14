@@ -445,6 +445,14 @@ async function run() {
       const result = await QACollection.find(query).toArray();
       res.send(result);
     });
+    app.get("/user/question-answer", async (req, res) => {
+      const email = req.query.email;
+      const query = {
+        "user.email": email,
+      };
+      const result = await QACollection.find(query).toArray();
+      res.send(result);
+    });
     app.get("/payment/history", async (req, res) => {
       const email = req.query.email;
       const result = await paymentHistoryCollection
