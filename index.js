@@ -465,18 +465,18 @@ async function run() {
       const count = result.length;
       res.send({ result, count });
     });
-    // app.get("/enrolled/single/instructor", async (res, req) => {
-    //   const email = req?.query?.email;
-    //   const instructorEmail = req?.query?.instructorEmail;
-    //   const query = {
-    //     "payment.email": email,
-    //     "payment.instructorEmail": instructorEmail,
-    //   };
-    //   // const result = await paymentHistoryCollection.find(query).toArray();
-    //   // const count = result.length;
-    //   // res.send(result, count);
-    //   console.log(email, instructorEmail);
-    // });
+    app.get("/enrolled/single/instructor", async (req, res) => {
+      const email = req?.query?.email;
+      const instructorEmail = req?.query?.instructorEmail;
+      const query = {
+        "payment.email": email,
+        "payment.instructorEmail": instructorEmail,
+      };
+      const result = await paymentHistoryCollection.find(query).toArray();
+      const count = result.length;
+      res.send({ result, count });
+      console.log(email, instructorEmail);
+    });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
