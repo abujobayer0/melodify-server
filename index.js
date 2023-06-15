@@ -461,7 +461,7 @@ async function run() {
       const result = await QACollection.find(query).toArray();
       res.send(result);
     });
-    app.put("/instructor/question-answer", async (req, res) => {
+    app.put("/instructor/question-answer/:id", async (req, res) => {
       const { id } = req.params;
       const query = { _id: new ObjectId(id) };
       const { answer } = req.body;
