@@ -42,19 +42,21 @@ async function run() {
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
+
     app.get("/users", async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
     app.put("/update/user", async (req, res) => {
       const email = req.query.email;
-      const { name, address, number, gender } = req.body;
+      const { name, address, number, gender, iframe } = req.body;
       console.log(name, address, number, gender);
       const query = { email: email };
       const result = await usersCollection.updateOne(query, {
         $set: {
           name: name,
           gender: gender,
+          iframe: iframe,
           contactNumber: number,
           address: address,
         },
@@ -481,6 +483,7 @@ async function run() {
       const count = result.length;
       res.send({ result, count });
     });
+
     app.get("/enrolled/single/instructor", async (req, res) => {
       const email = req?.query?.email;
       const instructorEmail = req?.query?.instructorEmail;
