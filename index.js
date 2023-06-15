@@ -455,7 +455,23 @@ async function run() {
       const result = await QACollection.find(query).toArray();
       res.send(result);
     });
-
+    app.get("/instructor/question-answer", async (req, res) => {
+      const email = req.query.email;
+      const query = { "instructor.email": email };
+      const result = await QACollection.find(query).toArray();
+      res.send(result);
+    });
+    app.put("/instructor/question-answer", async (req, res) => {
+      const { id } = req.params;
+      const query = { _id: new ObjectId(id) };
+      const { answer } = req.body;
+      const result = await QACollection.updateOne(query, {
+        $set: {
+          answer: answer,
+        },
+      });
+      res.send(result);
+    });
     app.get("/payment/history", async (req, res) => {
       const email = req.query.email;
       const result = await paymentHistoryCollection
