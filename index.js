@@ -222,14 +222,20 @@ async function run() {
       const classes = await classCollection.find(query).toArray();
       const emails = classes.map((i) => i?.newClass?.enroll);
       const emailArray = emails.flat();
-      const students = await usersCollection
-        .find({
-          $or: emailArray.map((email) => ({ email })),
-        })
-        .toArray();
+
+      let students = [];
+      if (emailArray && emailArray.length > 0) {
+        students = await usersCollection
+          .find({
+            $or: emailArray.map((email) => ({ email })),
+          })
+          .toArray();
+      }
+
       console.log(classes, students);
       res.send({ classes, students });
     });
+
     app.put("/class/student/ban", async (req, res) => {
       const id = req.body.id;
       const userEmail = req.body.email;
