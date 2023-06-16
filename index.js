@@ -216,7 +216,20 @@ async function run() {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
-
+    app.get("/class/view/students/:id", async (req, res) => {
+      const { id } = req.params;
+      const query = { _id: new ObjectId(id) };
+      const classes = await classCollection.find(query).toArray();
+      const emails = classes.map((i) => i?.newClass?.enroll);
+      const emailArray = emails.flat();
+      const students = await usersCollection
+        .find({
+          $or: emailArray.map((email) => ({ email })),
+        })
+        .toArray();
+      console.log(classes, students);
+      res.send({ classes, students });
+    });
     app.get("/popular/instructors", async (req, res) => {
       try {
         const result = await classCollection
