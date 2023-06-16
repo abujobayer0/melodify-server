@@ -239,16 +239,38 @@ async function run() {
     app.put("/class/student/ban", async (req, res) => {
       const id = req.body.id;
       const userEmail = req.body.email;
+      const instructorEmail = req.body.instructorEmail;
+      const name = req.body.name;
       const query = { _id: new ObjectId(id) };
+
+      // Update newClass.enroll in classCollection
       const singleClass = await classCollection.findOne(query);
       const updatedEmailsArray = singleClass?.newClass?.enroll?.filter(
         (email) => email !== userEmail
       );
-      const result = await classCollection.updateOne(query, {
+      await classCollection.updateOne(query, {
         $set: { "newClass.enroll": updatedEmailsArray },
       });
-      res.send(result);
-      console.log(id, userEmail);
+
+      // Remove payment history from paymentHistoryCollection
+      const newQuery = {
+        "payment.email": userEmail,
+        "payment.name": name,
+        "payment.instructorEmail": instructorEmail,
+      };
+      await paymentHistoryCollection.deleteMany(newQuery);
+      const selectQuery = {
+        "selectedClass.newClass.email": instructorEmail,
+        email: userEmail,
+        "selectedClass.newClass.name": name,
+      };
+      await selectCollection.updateOne(selectQuery, {
+        $set: {
+          enroll: false,
+        },
+      });
+      console.log(id, userEmail, instructorEmail, name);
+      res.sendStatus(200);
     });
 
     app.get("/popular/instructors", async (req, res) => {
