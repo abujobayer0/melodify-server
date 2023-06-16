@@ -230,6 +230,21 @@ async function run() {
       console.log(classes, students);
       res.send({ classes, students });
     });
+    app.put("/class/student/ban", async (req, res) => {
+      const id = req.body.id;
+      const userEmail = req.body.email;
+      const query = { _id: new ObjectId(id) };
+      const singleClass = await classCollection.findOne(query);
+      const updatedEmailsArray = singleClass?.newClass?.enroll?.filter(
+        (email) => email !== userEmail
+      );
+      const result = await classCollection.updateOne(query, {
+        $set: { "newClass.enroll": updatedEmailsArray },
+      });
+      res.send(result);
+      console.log(id, userEmail);
+    });
+
     app.get("/popular/instructors", async (req, res) => {
       try {
         const result = await classCollection
