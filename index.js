@@ -3,9 +3,9 @@ const express = require("express");
 require("dotenv").config();
 const cors = require("cors");
 const stripe = require("stripe")(process.env.PAYMENT_SECRET);
-const satelize = require('satelize');
+
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 7000;
 
 // Middleware
 app.use(cors());
@@ -41,21 +41,6 @@ async function run() {
       const user = req.body;
       const result = await usersCollection.insertOne(user);
       res.send(result);
-    });
-
-    app.get('/geolocation', async(req, res) => {
-      const clientIP = await req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-      console.log(clientIP);
-    
-      satelize.satelize({  ip:clientIP }, (err, geoData) => {
-        if (err) {
-          console.error('Error retrieving geolocation:', err);
-          res.status(500).json({ error: 'Failed to retrieve geolocation' });
-        } else {
-          console.log(geoData);
-          res.send(geoData);
-        }
-      });
     });
 
     app.get("/users", async (req, res) => {
