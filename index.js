@@ -43,11 +43,11 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/geolocation', (req, res) => {
-      const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    app.get('/geolocation', async(req, res) => {
+      const clientIP = await req.headers['x-forwarded-for'] || req.connection.remoteAddress;
       console.log(clientIP);
     
-      satelize.satelize({ ip:clientIP }, (err, geoData) => {
+      satelize.satelize({  ip:clientIP }, (err, geoData) => {
         if (err) {
           console.error('Error retrieving geolocation:', err);
           res.status(500).json({ error: 'Failed to retrieve geolocation' });
